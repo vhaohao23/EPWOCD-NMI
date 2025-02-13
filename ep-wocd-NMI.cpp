@@ -6,7 +6,7 @@ int N;
 int NE;
 const double p=1.0;
 const double lenP=5.0;
-
+vector<int> groundTruth={0,1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 2, 2, 1, 1, 2, 1, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2};
 vector<vector<bool>> A;
 vector<vector<int>> x(pop+1);
 vector<vector<int>> e;
@@ -14,18 +14,46 @@ vector<int> xBest;
 vector<int> d;
 vector<vector<int>> dk(pop+1);
 vector<vector<int>> lk(pop+1);
-
 random_device rd;   
 mt19937 gen(rd());
+double calI(vector<int> l1,vector<int> l2){
+    int s1 = *max_element(l1.begin(), l1.end());
+    int s2 = *max_element(l2.begin(), l2.end());
+    vector<vector<int>> c1 (s1+1);
+    vector<vector<int>> c2(s2+1);
 
-double modularity(vector<int> dk,vector<int> lk){
-    double Q=0;
+    for (int i=1;i<=N;i++)
+        c1[l1[i]].push_back(i),c2[l2[i]].push_back(i);
 
-    for (int i=1;i<=N;i++){
-        Q+=double(lk[i])/double(NE)-pow(double(dk[i])/double(2*NE),2.0);
+    double I=0;
+    for (int i=1;i<=s1;i++){
+        if (c1[i].empty()) continue;
+        for (int j=1;j<=s2;j++){
+            if (c2[j].empty()) continue;
+            
+            double Cij=0;
+            for (int v:c1[i]) if (l2[v]==j) Cij++;
+            if (Cij)
+                I+=Cij*log( Cij*double(N)/double(c1[i].size()*c2[j].size()) );
+        }
     }
 
-    return Q;
+    return I;
+}
+double calH(vector<int> l){
+    int s=*max_element(l.begin(), l.end());
+    vector<vector<int>> c(s+1);
+    for (int i=1;i<=N;i++)
+        c[l[i]].push_back(i);
+    double H=0;
+    for (int i=1;i<=s;i++)
+    if (c[i].size()){
+        H+=double(c[i].size()*log(double(c[i].size())/double(N)));
+    }
+    return H;
+}
+double NMI(vector<int> l1,vector<int> l2){
+    return -2.0*calI(l1,l2)/(calH(l1)+calH(l2));
 }
 
 void transfer(vector<int> &dk,vector<int> &lk,vector<int> l,int i,int l1,int l2){
@@ -182,7 +210,7 @@ void mutation(vector<int> &l,vector<int> &dk,vector<int> &lk,double u){
                 }
             }
             
-            if (modularity(dk,lk)<modularity(dktmp,lktmp)){
+            if (NMI(l,groundTruth)<NMI(ltmp,groundTruth)){
                 --S;
                 l=ltmp;
                 dk=dktmp;
@@ -221,7 +249,7 @@ void boudaryNodeAdjustment(vector<int> &l,vector<int> &dk,vector<int> &lk){
                     transfer(dk,lk,l,i,l[i],l[neighbor]);
                     l[i]=l[neighbor];
 
-                    if (modularity(dk,lk)<modularity(dktmp,lktmp)){
+                    if (NMI(l,groundTruth)<NMI(tmpl,groundTruth)){
                         dk=dktmp;
                         lk=lktmp;
                         l=tmpl;
@@ -238,7 +266,7 @@ void EPD(){
 
     vector<pair<double, int>> modularityValues;
     for (int i = 1; i <= pop; i++) {
-        double modValue = modularity(dk[i],lk[i]);  
+        double modValue = NMI(x[i],groundTruth);  
         modularityValues.push_back({modValue, i});
     }
 
@@ -295,11 +323,10 @@ void EP_WOCD(){
     initialization();
     double ans=0;
     for (int i=1;i<=pop;i++)
-        if (modularity(dk[i],lk[i])>ans){
-            ans=modularity(dk[i],lk[i]);
+        if (NMI(x[i],groundTruth)>ans){
+            ans=NMI(x[i],groundTruth);
             xBest=x[i];
         }
-
     for (int t=1;t<=T;t++){
         for (int p=1;p<=pop;p++){
             updateLocation(x[p],t,dk[p],lk[p]);
@@ -308,13 +335,13 @@ void EP_WOCD(){
             
         }
         for (int i=1;i<=pop;i++){
-            if (modularity(dk[i],lk[i])>ans){
-                ans=modularity(dk[i],lk[i]);
+            if (NMI(x[i],groundTruth)>ans){
+                ans=NMI(x[i],groundTruth);
                 xBest=x[i];
             }
 
-            
-        }
+        cout<<ans<<"\n";
+    }
         EPD();        
     }    
 
